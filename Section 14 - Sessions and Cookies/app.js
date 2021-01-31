@@ -4,16 +4,17 @@ const path = require('path');
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
-const morgan = require('morgan');
 const session = require('express-session');
 const MongoDBStore = require('connect-mongodb-session')(session);
 
 const errorController = require('./controllers/error');
 const User = require('./models/user');
 
+const MONGODB_URI = process.env.MONGODB_URI;
+
 const app = express();
 const store = new MongoDBStore({
-  uri: process.env.MONGODB_URI,
+  uri: MONGODB_URI,
   collection: 'sessions'
 });
 
@@ -26,13 +27,14 @@ const authRoutes = require('./routes/auth');
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(morgan('dev'));
-app.use(session({
-  secret: 'this should be a long string value in production',
-  resave: false,
-  saveUninitialized: false,
-  store: store
-}));
+app.use(
+  session({
+    secret: 'my secret',
+    resave: false,
+    saveUninitialized: false,
+    store: store
+  })
+);
 
 app.use((req, res, next) => {
   if (!req.session.user) {
@@ -43,7 +45,7 @@ app.use((req, res, next) => {
       req.user = user;
       next();
     })
-    .catch(err => console.log(err));;
+    .catch(err => console.log(err));
 });
 
 app.use('/admin', adminRoutes);
@@ -53,12 +55,8 @@ app.use(authRoutes);
 app.use(errorController.get404);
 
 mongoose
-  .connect(process.env.MONGODB_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-  })
+  .connect(MONGODB_URI)
   .then(result => {
-    console.log('CONNECTED');
     User.findOne().then(user => {
       if (!user) {
         const user = new User({
